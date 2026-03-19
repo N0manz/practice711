@@ -20,46 +20,50 @@ import java.util.function.Function;
 @Service
 public class JwtService {
 
-
     private String secret = "VGhpcyBpcyBhIHZlcnkgc2VjdXJlIHRlc3Qgc2VjcmV0IQ==";
 
+    private long accessTokenExpirationMs = 3600000; // 1 час
+    private long refreshTokenExpirationMs = 86400000; // 24 часа
 
-    private long expirationMs =3600000;
+    // Генерация Access токена
+    public String generateAccessToken(User user) {
+        return Jwts.builder()
+                .setSubject(user.getId().toString())
+                .claim("username", user.getEmail())
+                .setIssuedAt(new Date(System.currentTimeMillis()))
+                .setExpiration(new Date(System.currentTimeMillis() + accessTokenExpirationMs))
+                .signWith(getSignInKey(), SignatureAlgorithm.HS256)
+                .compact();
+    }
 
+    // Генерация Refresh токена
+    public String generateRefreshToken(User user) {
+        return Jwts.builder()
+                .setSubject(user.getId().toString())
+                .claim("username", user.getEmail())
+                .setIssuedAt(new Date(System.currentTimeMillis()))
+                .setExpiration(new Date(System.currentTimeMillis() + refreshTokenExpirationMs))
+                .signWith(getSignInKey(), SignatureAlgorithm.HS256)
+                .compact();
+    }
+
+    // Проверка refresh токена
+    public boolean isRefreshTokenValid(String token, UserDetails userDetails) {
+        String username = extractUsername(token);
+        return username.equals(userDetails.getUsername()) && !isTokenExpired(token);
+    }
+
+    // Остальные методы остаются без изменений
+    public String extractUsername(String token) {
+        return extractClaim(token, claims -> claims.get("username", String.class));
+    }
 
     public UUID extractUserId(String token) {
         return UUID.fromString(extractClaim(token, Claims::getSubject));
     }
 
-    public String extractUsername(String token) {
-        return extractClaim(token, claims -> claims.get("username", String.class));
-    }
-
-    public boolean isTokenValid(String token, UserDetails userDetails) {
-        String username = extractUsername(token);
-        return username.equals(userDetails.getUsername()) && !isTokenExpired(token);
-    }
-
-//    public String generateToken(UserDetails userDetails) {
-//        return generateToken(Map.of(), userDetails);
-//    }
-
-    public String generateToken(User user) {
-        return Jwts.builder()
-                .setSubject(user.getId().toString())
-                .claim("username", user.getEmail())
-                .setIssuedAt(new Date(System.currentTimeMillis()))
-                .setExpiration(new Date(System.currentTimeMillis() + expirationMs))
-                .signWith(getSignInKey(), SignatureAlgorithm.HS256)
-                .compact();
-    }
-
-    private boolean isTokenExpired(String token) {
-        return extractExpiration(token).before(new Date());
-    }
-
-    private Date extractExpiration(String token) {
-        return extractClaim(token, Claims::getExpiration);
+    public boolean isTokenExpired(String token) {
+        return extractClaim(token, Claims::getExpiration).before(new Date());
     }
 
     public <T> T extractClaim(String token, Function<Claims, T> resolver) {
@@ -68,8 +72,7 @@ public class JwtService {
     }
 
     private Claims extractAllClaims(String token) {
-        return Jwts
-                .parserBuilder()
+        return Jwts.parserBuilder()
                 .setSigningKey(getSignInKey())
                 .build()
                 .parseClaimsJws(token)
@@ -80,5 +83,4 @@ public class JwtService {
         byte[] keyBytes = Decoders.BASE64.decode(secret);
         return Keys.hmacShaKeyFor(keyBytes);
     }
-
 }

@@ -41,12 +41,13 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth->
                         auth.requestMatchers(
                                         "/api/auth/login",
-                                        "/api/auth/register")
+                                        "/api/auth/register",
+                                        "/api/auth/refresh")
                                 .permitAll()
                                 .requestMatchers(HttpMethod.GET, "/api/products/**").authenticated()
                                 .requestMatchers(HttpMethod.PUT, "/api/products/**").authenticated()
                                 .requestMatchers(HttpMethod.DELETE, "/api/products/**").authenticated()
-
+                                .requestMatchers("/api/auth/me").authenticated()
                                 .anyRequest().authenticated()
                 );
         http.addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class);

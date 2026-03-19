@@ -20,6 +20,7 @@ import java.util.UUID;
 @Service
 @RequiredArgsConstructor
 public class AuthService {
+
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
@@ -31,35 +32,53 @@ public class AuthService {
         }
 
         User user = new User();
-        user.setId(UUID.randomUUID());
         user.setFirstName(request.getFirstName());
         user.setLastName(request.getLastName());
         user.setEmail(request.getEmail());
         user.setPassword(passwordEncoder.encode(request.getPassword()));
         userRepository.save(user);
 
-        String token = jwtService.generateToken(user);
-        return new AuthResponse(token);
+        String accessToken = jwtService.generateAccessToken(user);
+        String refreshToken = jwtService.generateRefreshToken(user);
+
+        return new AuthResponse(accessToken, refreshToken);
     }
 
     public AuthResponse authenticate(AuthRequest request) {
 
-        try {
-            authenticationManager.authenticate(
-                    new UsernamePasswordAuthenticationToken(
-                            request.getEmail(),
-                            request.getPassword()
-                    )
-            );
-        } catch (Exception e) {
-            e.printStackTrace();
-            throw e;
+        authenticationManager.authenticate(
+                new UsernamePasswordAuthenticationToken(
+                        request.getEmail(),
+                        request.getPassword()
+                )
+        );
+
+        User user = userRepository.findByEmail(request.getEmail())
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        String accessToken = jwtService.generateAccessToken(user);
+        String refreshToken = jwtService.generateRefreshToken(user);
+
+        return new AuthResponse(accessToken, refreshToken);
+    }
+
+    // Новый метод для refresh
+    public AuthResponse refresh(String refreshToken) {
+        if (refreshToken == null || refreshToken.isEmpty()) {
+            throw new RuntimeException("Refresh token is missing");
         }
 
-        User user = userRepository
-                .findByEmail(request.getEmail()).orElseThrow(() -> new RuntimeException("User not found"));
+        UUID userId = jwtService.extractUserId(refreshToken);
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("User not found"));
 
-        String token = jwtService.generateToken(user);
-        return new AuthResponse(token);
+        if (!jwtService.isRefreshTokenValid(refreshToken, user)) {
+            throw new RuntimeException("Invalid refresh token");
+        }
+
+        String newAccessToken = jwtService.generateAccessToken(user);
+        String newRefreshToken = jwtService.generateRefreshToken(user);
+
+        return new AuthResponse(newAccessToken, newRefreshToken);
     }
 }
