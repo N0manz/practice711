@@ -6,28 +6,32 @@ import mirea.practice711.dao.repositories.UserRepository;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
+import java.util.List;
 import java.util.UUID;
 
 @Service
-@RequiredArgsConstructor
 public class ClientService {
 
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
 
-    public User register(User user) {
-        user.setId(UUID.randomUUID());
-        user.setPassword(passwordEncoder.encode(user.getPassword()));
-        return userRepository.save(user);
+
+    public ClientService(UserRepository userRepository, PasswordEncoder passwordEncoder) {
+        this.userRepository = userRepository;
+        this.passwordEncoder = passwordEncoder;
     }
 
-    public User login(String email, String password) {
-        User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+    public List<User> getAll(){
+        List<User> users = userRepository.findAll();
+        System.out.println(users);
+        return users;
+    }
 
-        if (!passwordEncoder.matches(password, user.getPassword())) {
-            throw new RuntimeException("Invalid password");
-        }
-        return user;
+    public User getById(UUID id){
+        return userRepository.getUserById(id).orElseThrow();
+    }
+
+    public void delete(UUID id){
+        userRepository.delete(getById(id));
     }
 }

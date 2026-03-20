@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:sec="http://www.thymeleaf.org/extras/spring-security">>
+<head>
+    <title>Profile</title>
+</head>
+<body>
+
+<h2>Профиль</h2>
+
+<p>Email: <span th:text="${user.email}"></span></p>
+<p>Имя: <span th:text="${user.firstName}"></span></p>
+<p>Фамилия: <span th:text="${user.lastName}"></span></p>
+
+<a href="/users">Все пользователи</a>
+<br>
+<a href="/logout">Выйти</a>
+
+</body>
+</html>

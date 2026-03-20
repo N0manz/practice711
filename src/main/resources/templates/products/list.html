@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
+<head>
+    <title>Список товаров</title>
+</head>
+<body>
+<h1>Список товаров</h1>
+
+<!-- Кнопка создания доступна только SELLER -->
+<div sec:authorize="hasRole('SELLER')">
+    <a href="/products/create">Создать новый товар</a>
+</div>
+
+<table border="1">
+    <tr>
+        <th>Название</th>
+        <th>Категория</th>
+        <th>Цена</th>
+        <th>Действия</th>
+    </tr>
+    <tr th:each="product : ${products}">
+        <td th:text="${product.title}"></td>
+        <td th:text="${product.category}"></td>
+        <td th:text="${product.price}"></td>
+        <td>
+            <a th:href="@{/products/{id}(id=${product.id})}">Просмотр</a>
+            <span sec:authorize="hasRole('SELLER')">
+                | <a th:href="@{/products/{id}/edit(id=${product.id})}">Редактировать</a>
+            </span>
+            <span sec:authorize="hasRole('ADMIN')">
+                | <form th:action="@{/products/{id}/delete(id=${product.id})}" method="post" style="display:inline">
+                    <button type="submit">Удалить</button>
+                  </form>
+            </span>
+        </td>
+    </tr>
+</table>
+
+<a href="/">Назад</a>
+</body>
+</html>

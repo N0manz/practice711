@@ -13,6 +13,7 @@ import org.springframework.stereotype.Service;
 
 import java.security.Key;
 import java.util.Date;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.function.Function;
@@ -25,43 +26,67 @@ public class JwtService {
     private long accessTokenExpirationMs = 3600000; // 1 час
     private long refreshTokenExpirationMs = 86400000; // 24 часа
 
-    // Генерация Access токена
+    // =========================
+    // ACCESS TOKEN
+    // =========================
     public String generateAccessToken(User user) {
         return Jwts.builder()
                 .setSubject(user.getId().toString())
                 .claim("username", user.getEmail())
-                .setIssuedAt(new Date(System.currentTimeMillis()))
+                .claim("roles", user.getAuthorities().stream()
+                        .map(auth -> auth.getAuthority())
+                        .toList()
+                )
+                .setIssuedAt(new Date())
                 .setExpiration(new Date(System.currentTimeMillis() + accessTokenExpirationMs))
                 .signWith(getSignInKey(), SignatureAlgorithm.HS256)
                 .compact();
     }
 
-    // Генерация Refresh токена
+    // =========================
+    // REFRESH TOKEN
+    // =========================
     public String generateRefreshToken(User user) {
         return Jwts.builder()
                 .setSubject(user.getId().toString())
                 .claim("username", user.getEmail())
-                .setIssuedAt(new Date(System.currentTimeMillis()))
+                .setIssuedAt(new Date())
                 .setExpiration(new Date(System.currentTimeMillis() + refreshTokenExpirationMs))
                 .signWith(getSignInKey(), SignatureAlgorithm.HS256)
                 .compact();
     }
 
-    // Проверка refresh токена
-    public boolean isRefreshTokenValid(String token, UserDetails userDetails) {
-        String username = extractUsername(token);
-        return username.equals(userDetails.getUsername()) && !isTokenExpired(token);
+    // =========================
+    // VALIDATION
+    // =========================
+    public boolean isTokenValid(String token, UserDetails userDetails) {
+        final String username = extractUsername(token);
+
+        return username.equals(userDetails.getUsername())
+                && !isTokenExpired(token);
     }
 
-    // Остальные методы остаются без изменений
+    public boolean isRefreshTokenValid(String token, UserDetails userDetails) {
+        return isTokenValid(token, userDetails);
+    }
+
+    // =========================
+    // EXTRACT
+    // =========================
     public String extractUsername(String token) {
-        return extractClaim(token, claims -> claims.get("username", String.class));
+        Object username = extractAllClaims(token).get("username");
+        System.out.println(extractAllClaims(token));
+        return username != null ? username.toString() : null;
     }
 
     public UUID extractUserId(String token) {
         return UUID.fromString(extractClaim(token, Claims::getSubject));
     }
 
+
+    // =========================
+    // COMMON
+    // =========================
     public boolean isTokenExpired(String token) {
         return extractClaim(token, Claims::getExpiration).before(new Date());
     }

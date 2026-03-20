@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
+<head>
+    <title>Детали товара</title>
+</head>
+<body>
+<h1 th:text="${product.title}">Название товара</h1>
+
+<p><strong>Категория:</strong> <span th:text="${product.category}"></span></p>
+<p><strong>Описание:</strong> <span th:text="${product.description}"></span></p>
+<p><strong>Цена:</strong> <span th:text="${product.price}"></span></p>
+
+<!-- Действия -->
+<div>
+    <span sec:authorize="hasRole('SELLER')">
+        <a th:href="@{/products/{id}/edit(id=${product.id})}">Редактировать</a>
+    </span>
+    <span sec:authorize="hasRole('ADMIN')">
+        <form th:action="@{/products/{id}/delete(id=${product.id})}" method="post" style="display:inline">
+            <button type="submit">Удалить</button>
+        </form>
+    </span>
+</div>
+
+<a href="/products">Назад к списку</a>
+</body>
+</html>

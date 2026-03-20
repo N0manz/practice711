@@ -1,10 +1,13 @@
 package mirea.practice711.security.jwt;
 
+import jakarta.servlet.http.Cookie;
+import lombok.RequiredArgsConstructor;
 import mirea.practice711.dao.entity.User;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import mirea.practice711.service.client.CustomUserDetailsService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -15,54 +18,87 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
+import java.util.Arrays;
 
 @Component
 public class JwtFilter extends OncePerRequestFilter {
-    private final JwtService jwtService;
-    private final UserDetailsService userDetailsService;
 
-    @Autowired
-    public JwtFilter(JwtService jwtService, UserDetailsService userDetailsService) {
+    private final JwtService jwtService;
+    private final CustomUserDetailsService userDetailsService;
+
+    public JwtFilter(JwtService jwtService, CustomUserDetailsService userDetailsService) {
         this.jwtService = jwtService;
         this.userDetailsService = userDetailsService;
     }
 
     @Override
-    protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain) throws ServletException, IOException {
+    protected void doFilterInternal(
+            HttpServletRequest request,
+            HttpServletResponse response,
+            FilterChain filterChain
+    ) throws ServletException, IOException {
+        System.out.println("URI: " + request.getRequestURI());
+        System.out.println("Cookies: " + Arrays.toString(request.getCookies()));
 
-        String path = request.getServletPath();
-        String authHeader = request.getHeader("Authorization");
+        String token = extractToken(request);
+        if (token != null) {
+            try {
+                String username = jwtService.extractUsername(token);
+                System.out.println(username);
+                System.out.println(SecurityContextHolder.getContext().getAuthentication());
+                if (username != null &&
+                        SecurityContextHolder.getContext().getAuthentication() == null) {
 
-        // 🔹 Публичные эндпоинты
-        if (path.equals("/api/auth/login") || path.equals("/api/auth/register") || path.equals("/api/auth/refresh")) {
-            filterChain.doFilter(request, response);
-            return;
-        }
 
-        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
-            filterChain.doFilter(request, response);
-            return;
-        }
+                    UserDetails userDetails =
+                            userDetailsService.loadUserByUsername(username);
+                    System.out.println("xyu");
+                    System.out.println("Token username: " + username);
+                    System.out.println("DB username: " + userDetails.getUsername());
+                    if (jwtService.isTokenValid(token, userDetails)) {
 
-        // 🔹 Проверяем access-токен
-        String jwt = authHeader.substring(7);
-        String username = jwtService.extractUsername(jwt);
-
-        if (username != null && SecurityContextHolder.getContext().getAuthentication() == null) {
-            UserDetails userDetails = userDetailsService.loadUserByUsername(username);
-
-            if (userDetails != null && !jwtService.isTokenExpired(jwt)) {
-                UsernamePasswordAuthenticationToken authToken =
-                        new UsernamePasswordAuthenticationToken(
-                                userDetails,
-                                null,
-                                userDetails.getAuthorities()
+                        UsernamePasswordAuthenticationToken authToken =
+                                new UsernamePasswordAuthenticationToken(
+                                        userDetails,
+                                        null,
+                                        userDetails.getAuthorities()
+                                );
+                        authToken.setDetails(
+                                new WebAuthenticationDetailsSource().buildDetails(request)
                         );
-                authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
-                SecurityContextHolder.getContext().setAuthentication(authToken);
+                        SecurityContextHolder.getContext().setAuthentication(authToken);
+                        System.out.println("Authorities: " + authToken.getAuthorities());
+                    }else{
+                        System.out.println("TOKEN INVALID");
+
+                    }
+                }
+
+            } catch (Exception e) {
+                e.printStackTrace();
             }
         }
 
         filterChain.doFilter(request, response);
+    }
+
+    private String extractToken(HttpServletRequest request) {
+
+        // 1. HEADER (на всякий случай)
+        String header = request.getHeader("Authorization");
+        if (header != null && header.startsWith("Bearer ")) {
+            return header.substring(7);
+        }
+
+        // 2. COOKIE (основной вариант)
+        if (request.getCookies() != null) {
+            for (Cookie cookie : request.getCookies()) {
+                if ("accessToken".equals(cookie.getName())) {
+                    return cookie.getValue();
+                }
+            }
+        }
+
+        return null;
     }
 }
